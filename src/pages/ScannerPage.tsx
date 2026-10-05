@@ -89,16 +89,37 @@ export function ScannerPage({ onAddedToInventory }: ScannerPageProps) {
 
   async function startCamera() {
     setError('');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError('Camera not available in this browser. This usually happens when the page is not served over HTTPS. Please use the Upload Image option instead, or access the app over a secure connection.');
+      setStep('error');
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
       setCameraActive(true);
-    } catch {
-      setError('Camera access denied or not available. Please upload an image instead.');
+
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.muted = true;
+          videoRef.current.play().catch(() => {});
+        }
+      });
+    } catch (err) {
+      let msg = 'Camera access failed.';
+      if (err instanceof DOMException) {
+        if (err.name === 'NotAllowedError') msg = 'Camera permission denied. Please allow camera access in your browser settings and try again.';
+        else if (err.name === 'NotFoundError') msg = 'No camera found on this device. Please use the Upload Image option instead.';
+        else if (err.name === 'NotReadableError') msg = 'Camera is already in use by another application. Close it and try again.';
+        else msg = `Camera error: ${err.message}`;
+      }
+      setError(msg);
       setStep('error');
     }
   }
@@ -256,7 +277,7 @@ export function ScannerPage({ onAddedToInventory }: ScannerPageProps) {
       {cameraActive && (
         <div className="glass-panel p-6">
           <div className="relative rounded-xl overflow-hidden bg-black mb-4" style={{ aspectRatio: '16/9' }}>
-            <video ref={videoRef} className="w-full h-full object-cover" playsInline />
+            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
             <div className="absolute inset-0 pointer-events-none">
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-cyan-400/50 rounded-2xl" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-0.5 bg-cyan-400/60 scan-line" style={{ borderRadius: '2px' }} />
