@@ -3,6 +3,16 @@ export type ItemStatus = 'Available' | 'Repaired' | 'Recycled' | 'Exchanged' | '
 export type PrintStatus = 'Pending' | 'Printing' | 'Completed' | 'Failed';
 export type ExchangeStatus = 'Available' | 'Requested' | 'Transferred';
 
+export interface SpacecraftProfile {
+  id: string;
+  spacecraft_name: string;
+  mission_type: string;
+  coordinates: string;
+  crew_size: number;
+  status: string;
+  created_at: string;
+}
+
 export interface InventoryItem {
   id: number;
   object_name: string;
@@ -20,6 +30,7 @@ export interface InventoryItem {
   recyclable: boolean;
   three_d_print_potential: boolean;
   image_url: string | null;
+  user_id: string | null;
   created_at: string;
 }
 
@@ -65,6 +76,7 @@ export interface ExchangeListing {
   description: string;
   listed_by: string;
   requested_by: string | null;
+  user_id: string | null;
   created_at: string;
 }
 
@@ -75,5 +87,17 @@ export interface ScanLog {
   material: string;
   condition: string;
   recommended_action: string;
+  created_at: string;
+}
+
+export interface NearbyDetection {
+  id: number;
+  spacecraft_id: string;
+  detected_object: string;
+  confidence: number;
+  material: string;
+  condition: string;
+  recommended_action: string;
+  auto_listed: boolean;
   created_at: string;
 }

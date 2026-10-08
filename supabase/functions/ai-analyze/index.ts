@@ -297,7 +297,88 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return new Response(JSON.stringify({ error: "Unknown endpoint. Use /scan, /analyze, or /3d-print" }), {
+    if (path === "auto-scan") {
+      const body = await req.json().catch(() => ({}));
+      const userId = body.user_id;
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "user_id required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const numDetections = Math.min(body.count || 3, 5);
+      const results: Array<{
+        object: string; confidence: number; material: string;
+        condition: string; recommended_action: string; auto_listed: boolean;
+      }> = [];
+
+      for (let i = 0; i < numDetections; i++) {
+        const det = simulateDetection();
+        const analysis = analyzeObject(det);
+        const autoListed = analysis.recommended_action === "EXCHANGE" || analysis.recommended_action === "REUSE";
+
+        await supabase.from("nearby_detections").insert({
+          spacecraft_id: userId,
+          detected_object: analysis.object,
+          confidence: analysis.confidence,
+          material: analysis.material,
+          condition: analysis.condition,
+          recommended_action: analysis.recommended_action,
+          auto_listed: autoListed,
+        });
+
+        if (autoListed) {
+          await supabase.from("exchange_listings").insert({
+            item_name: analysis.object,
+            material: analysis.material,
+            quantity: 1,
+            location: "Auto-Scan Detection",
+            status: "Available",
+            description: `Automatically detected and listed. ${analysis.reason}`,
+            listed_by: "Auto-Scanner System",
+            user_id: userId,
+          });
+        }
+
+        results.push({
+          object: analysis.object,
+          confidence: analysis.confidence,
+          material: analysis.material,
+          condition: analysis.condition,
+          recommended_action: analysis.recommended_action,
+          auto_listed: autoListed,
+        });
+      }
+
+      return new Response(JSON.stringify({ detections: results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (path === "nearby") {
+      const url2 = new URL(req.url);
+      const userId = url2.searchParams.get("user_id");
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "user_id query param required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const limit = Math.min(parseInt(url2.searchParams.get("limit") || "20"), 50);
+      const { data, error: qError } = await supabase
+        .from("nearby_detections")
+        .select("*")
+        .eq("spacecraft_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (qError) throw qError;
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: "Unknown endpoint. Use /scan, /analyze, /3d-print, /auto-scan, or /nearby" }), {
       status: 404,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

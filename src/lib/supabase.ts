@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { AnalysisResult, PrintJob } from '@/types';
+import type { AnalysisResult, PrintJob, NearbyDetection } from '@/types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -57,5 +57,31 @@ export async function createPrintJob(job: {
   if (!response.ok) throw new Error(`Print job creation failed (${response.status})`);
   const data = await response.json();
   return data;
+}
+
+export async function autoScan(userId: string, count: number = 3): Promise<NearbyDetection[]> {
+  const response = await fetch(`${FUNCTION_URL}/auto-scan`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${supabaseAnonKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ user_id: userId, count }),
+  });
+  if (!response.ok) throw new Error(`Auto-scan failed (${response.status})`);
+  const data = await response.json();
+  if (!data.detections) throw new Error('Invalid auto-scan response');
+  return data.detections;
+}
+
+export async function getNearbyDetections(userId: string, limit: number = 20): Promise<NearbyDetection[]> {
+  const response = await fetch(`${FUNCTION_URL}/nearby?user_id=${userId}&limit=${limit}`, {
+    headers: {
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+  });
+  if (!response.ok) throw new Error(`Nearby fetch failed (${response.status})`);
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
 }
 
